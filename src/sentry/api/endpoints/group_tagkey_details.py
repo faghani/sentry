@@ -71,5 +71,6 @@ class GroupTagKeyDetailsEndpoint(GroupEndpoint, EnvironmentMixin):
             'totalValues': total_values,
             'topValues': serialize(top_values, request.user),
         }
+        print(repr(data))
 
         return Response(data)
