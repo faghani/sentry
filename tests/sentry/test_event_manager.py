@@ -21,7 +21,7 @@ from sentry.event_manager import (
 )
 from sentry.models import (
     Activity, Environment, Event, Group, GroupEnvironment, GroupHash, GroupRelease, GroupResolution,
-    GroupStatus, GroupTombstone, EventMapping, Release, UserReport
+    GroupStatus, GroupTombstone, EventMapping, Release, ReleaseProjectEnvironment, UserReport
 )
 from sentry.signals import event_discarded, event_saved
 from sentry.testutils import assert_mock_called_once_with_partial, TestCase, TransactionTestCase
@@ -476,6 +476,73 @@ class EventManagerTest(TransactionTestCase):
         )
 
         mock_send_activity_notifications_delay.assert_called_once_with(activity.id)
+
+    def test_incr_new_group_env_release_counts(self):
+        project = self.create_project()
+        env_name = 'prod'
+        manager = EventManager(
+            self.make_event(
+                release='1.0',
+                environment=env_name,
+                event_id='a' * 32,
+                checksum='a' * 32,
+            )
+        )
+        manager.normalize()
+        with self.tasks():
+            manager.save(project.id)
+
+        release = Release.objects.get(version='1.0', projects=project.id)
+        environment = Environment.objects.get(
+            organization_id=project.organization_id,
+            name=env_name,
+        )
+        environment.add_project(project)
+        release_proj_env = ReleaseProjectEnvironment.objects.filter(
+            release=release,
+            project=project,
+            environment=environment,
+        )
+        assert release_proj_env
+        assert release_proj_env[0].new_issues_count == 1
+
+        manager = EventManager(
+            self.make_event(
+                release='1.0',
+                environment=env_name,
+                event_id='b' * 32,
+                checksum='b' * 32,
+            )
+        )
+        manager.normalize()
+        with self.tasks():
+            manager.save(project.id)
+        release_proj_env = ReleaseProjectEnvironment.objects.filter(
+            release=release,
+            project=project,
+            environment=environment,
+        )
+        assert release_proj_env
+        assert release_proj_env[0].new_issues_count == 2
+
+        manager = EventManager(
+            self.make_event(
+                release='1.0',
+                environment=env_name,
+                event_id='c' * 32,
+                checksum='a' * 32,
+            )
+        )
+        manager.normalize()
+        with self.tasks():
+            manager.save(project.id)
+        release_proj_env = ReleaseProjectEnvironment.objects.filter(
+            release=release,
+            project=project,
+            environment=environment,
+        )
+        assert release_proj_env and release_proj_env[0].id == 1
+        assert release_proj_env[0].new_issues_count == 2
 
     @mock.patch('sentry.models.Group.is_resolved')
     def test_unresolves_group_with_auto_resolve(self, mock_is_resolved):

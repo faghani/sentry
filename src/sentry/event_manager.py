@@ -759,11 +759,10 @@ class EventManager(object):
                 datetime=date,
             )
 
-            ReleaseProjectEnvironment.objects.get_or_create(
+            ReleaseProjectEnvironment.get_or_create(
                 project=project,
                 release=release,
                 environment=environment,
-                group=group,
                 datetime=date,
             )
 
@@ -867,10 +866,10 @@ class EventManager(object):
                 )
             if is_new_group_environment:
                 buffer.incr(
-                    ReleaseProjectEnvironment, {'new_issues_count': 1}, {
-                        'project_id': project.id,
-                        'release_id': release.id,
-                        'environment_id': environment.id,
+                    ReleaseProjectEnvironment, columns={'new_issues_count': 1}, filters={
+                        'project': project,
+                        'release': release,
+                        'environment': environment,
                     }
                 )
 
