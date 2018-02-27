@@ -169,9 +169,11 @@ class EventFileCommittersEndpoint(ProjectEndpoint):
         frames = self._get_frame_paths(event)
         frame_limit = 25
         app_frames = [frame for frame in frames if frame['in_app']][-frame_limit:]
+        if not app_frames:
+            app_frames = [frame for frame in frames][-frame_limit:]
 
         # TODO(maxbittker) return this set instead of annotated frames
-        path_set = {frame['abs_path'] for frame in app_frames}
+        path_set = {frame.get('filename') or frame['abs_path'] for frame in app_frames}
 
         file_changes = []
         if path_set:
@@ -184,7 +186,7 @@ class EventFileCommittersEndpoint(ProjectEndpoint):
         annotated_frames = [
             {
                 'frame': frame,
-                'commits': commit_path_matches[frame['abs_path']]
+                'commits': commit_path_matches[frame.get('filename') or frame['abs_path']]
             } for frame in app_frames
         ]
 
